@@ -19,9 +19,9 @@ type ClaudeConfig struct {
 	APIBaseURL string
 }
 
-func DefaultClaudeConfig() ClaudeConfig {
+func DefaultClaudeConfig(apiKey string) ClaudeConfig {
 	return ClaudeConfig{
-		APIKey:     "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",
+		APIKey:     apiKey,
 		ModelName:  "claude-3-7-sonnet-20250219",
 		MaxTokens:  400,
 		APIBaseURL: "https://api.anthropic.com/v1/messages",
@@ -81,7 +81,7 @@ const (
 	Info     RiskLevel = "Informational"
 )
 
-func AppendRiskJustifications(inputFilePath, outputFilePath string) error {
+func AppendRiskJustifications(inputFilePath, outputFilePath, apiKey string) error {
 	data, err := os.ReadFile(inputFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to read input file: %w", err)
@@ -94,7 +94,7 @@ func AppendRiskJustifications(inputFilePath, outputFilePath string) error {
 
 	fmt.Printf("Processing %d vulnerabilities with Claude...\n", len(riskData.Vulnerabilities))
 
-	config := DefaultClaudeConfig()
+	config := DefaultClaudeConfig(apiKey)
 	processedCount := 0
 
 	for i := range riskData.Vulnerabilities {
@@ -336,7 +336,7 @@ func filterVulnerabilitiesByOwner(vulns []VulnerabilityWithRisk, ownerName strin
 	return result
 }
 
-func GenerateOwnerReport(inputFilePath, outputFilePath, ownerName string) error {
+func GenerateOwnerReport(inputFilePath, outputFilePath, ownerName, apiKey string) error {
 	data, err := os.ReadFile(inputFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to read input file %s: %w", inputFilePath, err)
@@ -364,7 +364,7 @@ func GenerateOwnerReport(inputFilePath, outputFilePath, ownerName string) error 
 
 	sortVulnerabilitiesByPriority(&criticalAndHighVulns)
 
-	config := DefaultClaudeConfig()
+	config := DefaultClaudeConfig(apiKey)
 
 	fmt.Printf("Generating vulnerability report with Claude for owner %s...\n", ownerName)
 

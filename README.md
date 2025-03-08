@@ -1,0 +1,1 @@
+go run cmd/main.go remediation-owner-report --owner "0001" --api-key "sampleapikey"
