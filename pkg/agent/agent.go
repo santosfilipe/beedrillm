@@ -109,8 +109,6 @@ func AppendRiskJustifications(inputFilePath, outputFilePath, apiKey string) erro
 		vuln.Justification = riskJustification
 		processedCount++
 
-		time.Sleep(500 * time.Millisecond)
-
 		if processedCount%5 == 0 {
 			fmt.Printf("Processed %d/%d vulnerabilities...\n", processedCount, len(riskData.Vulnerabilities))
 		}
@@ -233,12 +231,11 @@ func GetRiskLevelPriority(level RiskLevel) int {
 	}
 }
 
-// EnvironmentPriority returns a numeric priority for an environment (higher number = higher priority)
 func EnvironmentPriority(env string) int {
 	env = strings.ToLower(env)
 	switch env {
 	case "pci", "pci-dss":
-		return 5 // PCI environments are highest priority due to compliance requirements
+		return 5
 	case "production", "prod":
 		return 4
 	case "staging", "stage":
@@ -252,7 +249,6 @@ func EnvironmentPriority(env string) int {
 	}
 }
 
-// AssetCriticalityPriority returns a numeric priority for asset criticality (higher number = higher priority)
 func AssetCriticalityPriority(criticality string) int {
 	criticality = strings.ToLower(criticality)
 	switch criticality {
@@ -271,7 +267,6 @@ func AssetCriticalityPriority(criticality string) int {
 
 func sortVulnerabilitiesByPriority(vulns *[]VulnerabilityWithRisk) {
 	sort.SliceStable(*vulns, func(i, j int) bool {
-		// First sort by risk level (Critical > High > Medium > Low > Info)
 		riskLevelI := RiskLevel((*vulns)[i].RiskLevel)
 		riskLevelJ := RiskLevel((*vulns)[j].RiskLevel)
 		levelPriorityI := GetRiskLevelPriority(riskLevelI)
@@ -281,12 +276,10 @@ func sortVulnerabilitiesByPriority(vulns *[]VulnerabilityWithRisk) {
 			return levelPriorityI > levelPriorityJ
 		}
 
-		// If risk levels are the same, sort by risk score (higher first)
 		if (*vulns)[i].RiskScore != (*vulns)[j].RiskScore {
 			return (*vulns)[i].RiskScore > (*vulns)[j].RiskScore
 		}
 
-		// If risk scores are the same, consider environment (PCI > Production > Staging > etc.)
 		envPriorityI := EnvironmentPriority((*vulns)[i].Environment)
 		envPriorityJ := EnvironmentPriority((*vulns)[j].Environment)
 
@@ -294,7 +287,6 @@ func sortVulnerabilitiesByPriority(vulns *[]VulnerabilityWithRisk) {
 			return envPriorityI > envPriorityJ
 		}
 
-		// If environments are the same, consider asset criticality
 		assetPriorityI := AssetCriticalityPriority((*vulns)[i].AssetCriticality)
 		assetPriorityJ := AssetCriticalityPriority((*vulns)[j].AssetCriticality)
 
@@ -305,7 +297,6 @@ func sortVulnerabilitiesByPriority(vulns *[]VulnerabilityWithRisk) {
 func filterVulnerabilitiesByOwner(vulns []VulnerabilityWithRisk, ownerName string) []VulnerabilityWithRisk {
 	result := []VulnerabilityWithRisk{}
 
-	// Check if we have explicit ownership information
 	hasOwnershipInfo := false
 	for _, vuln := range vulns {
 		if vuln.AssetOwner != "" {
@@ -314,19 +305,14 @@ func filterVulnerabilitiesByOwner(vulns []VulnerabilityWithRisk, ownerName strin
 		}
 	}
 
-	// If we have explicit ownership data
 	if hasOwnershipInfo {
-		// Find vulnerabilities with exact owner match
 		for _, vuln := range vulns {
 			if strings.EqualFold(vuln.AssetOwner, ownerName) {
 				result = append(result, vuln)
 			}
 		}
 	} else {
-		// If no explicit ownership, use asset name pattern matching
-		// This assumes asset naming conventions that include owner information
 		for _, vuln := range vulns {
-			// Check if asset name contains owner name (case insensitive)
 			if strings.Contains(strings.ToLower(vuln.AssetName), strings.ToLower(ownerName)) {
 				result = append(result, vuln)
 			}
@@ -419,10 +405,9 @@ The tone should be professional but urgent for critical issues. Do not use markd
 Make the report comprehensive yet focused on the most important information for the team to take action.`,
 		ownerName, len(vulns), string(vulnsJSON))
 
-	// Prepare request to Claude API
 	requestBody := ClaudeRequest{
 		Model:     config.ModelName,
-		MaxTokens: 8000, // Increased token limit for comprehensive reports
+		MaxTokens: 8000,
 		Messages: []ClaudeMessageItem{
 			{
 				Role:    "user",
@@ -436,7 +421,6 @@ Make the report comprehensive yet focused on the most important information for 
 		return "", fmt.Errorf("error marshaling request: %w", err)
 	}
 
-	// Send request to Claude API
 	req, err := http.NewRequest("POST", config.APIBaseURL, bytes.NewBuffer(requestJSON))
 	if err != nil {
 		return "", fmt.Errorf("error creating request: %w", err)
@@ -453,24 +437,20 @@ Make the report comprehensive yet focused on the most important information for 
 	}
 	defer resp.Body.Close()
 
-	// Read response
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("error reading response: %w", err)
 	}
 
-	// Parse response
 	var claudeResp ClaudeResponse
 	if err := json.Unmarshal(body, &claudeResp); err != nil {
 		return "", fmt.Errorf("error parsing response: %w", err)
 	}
 
-	// Check for errors
 	if claudeResp.Error != nil {
 		return "", fmt.Errorf("claude API error: %s", claudeResp.Error.Message)
 	}
 
-	// Extract report
 	if len(claudeResp.Content) == 0 {
 		return "", fmt.Errorf("empty response from Claude API")
 	}

@@ -49,13 +49,13 @@ type VulnerabilityWithRisk struct {
 	Justification    string `json:"risk_justification"`
 }
 
-type VulnerbilityRiskReport struct {
+type VulnerabilityRiskReport struct {
 	Vulnerabilities []VulnerabilityWithRisk `json:"vulnerabilities"`
 	GeneratedAt     string                  `json:"generated_at"`
 }
 
 func ExportVulnerabilitiesWithRisk(vulnRisks []VulnerabilityRisk, filePath string) error {
-	exportData := VulnerbilityRiskReport{
+	exportData := VulnerabilityRiskReport{
 		Vulnerabilities: make([]VulnerabilityWithRisk, len(vulnRisks)),
 		GeneratedAt:     time.Now().Format(time.RFC3339),
 	}
@@ -65,7 +65,6 @@ func ExportVulnerabilitiesWithRisk(vulnRisks []VulnerabilityRisk, filePath strin
 		risk := vr.Risk
 
 		exportData.Vulnerabilities[i] = VulnerabilityWithRisk{
-			// Original vulnerability fields
 			CVE:              vuln.CVE,
 			Description:      vuln.Description,
 			Severity:         vuln.Severity,
@@ -76,7 +75,6 @@ func ExportVulnerabilitiesWithRisk(vulnRisks []VulnerabilityRisk, filePath strin
 			AssetOs:          vuln.AssetOs,
 			Environment:      vuln.Environment,
 
-			// Risk assessment fields
 			RiskLevel:     string(risk.CalculatedRisk),
 			RiskScore:     risk.RiskScore,
 			Justification: "",
