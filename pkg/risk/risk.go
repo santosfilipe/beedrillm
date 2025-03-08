@@ -40,7 +40,9 @@ type VulnerabilityWithRisk struct {
 	Severity         string `json:"severity"`
 	Url              string `json:"vulnurl"`
 	AssetName        string `json:"assetname"`
+	AssetOwner       string `json:"assetowner"`
 	AssetCriticality string `json:"assetcriticality"`
+	AssetOs          string `json:"assetos"`
 	Environment      string `json:"environment"`
 	RiskLevel        string `json:"risk_level"`
 	RiskScore        int    `json:"risk_score"`
@@ -69,7 +71,9 @@ func ExportVulnerabilitiesWithRisk(vulnRisks []VulnerabilityRisk, filePath strin
 			Severity:         vuln.Severity,
 			Url:              vuln.Url,
 			AssetName:        vuln.AssetName,
+			AssetOwner:       vuln.AssetOwner,
 			AssetCriticality: vuln.AssetCriticality,
+			AssetOs:          vuln.AssetOs,
 			Environment:      vuln.Environment,
 
 			// Risk assessment fields

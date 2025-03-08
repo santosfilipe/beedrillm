@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"os"
 
@@ -10,28 +11,47 @@ import (
 )
 
 func main() {
-	vulnFilePath := "../testdata/vulnerabilities.json"
-	vulnRiskFilePath := "../testdata/vulnerabilities-risk-assessed.json"
-	vulnLlmReport := "../testdata/claude-enhanced-report.json"
+	vulnRawData := "../testdata/vulnerabilities.json"
+	vulnDataRiskScored := "../testdata/vulnerabilities-risk-assessed.json"
+	vulnDataRiskJustified := "../testdata/vulnerabilities-risk-justified.json"
 
-	if _, err := os.Stat(vulnFilePath); os.IsNotExist(err) {
-		log.Fatalf("Error: Vulnerability file not found at path: %s", vulnFilePath)
+	remediationOwnerReportCmd := flag.NewFlagSet("remediation-owner-report", flag.ExitOnError)
+	ownerId := remediationOwnerReportCmd.String("owner", "", "Name of the asset owner to generate report for")
+
+	switch os.Args[1] {
+
+	case "remediation-owner-report":
+		remediationOwnerReportCmd.Parse(os.Args[2:])
+
+		if *ownerId == "" {
+			log.Fatalf("Error: Owner name must be specified with --owner parameter")
+		}
+
+		if _, err := os.Stat(vulnRawData); os.IsNotExist(err) {
+			log.Fatalf("Error: Vulnerability file not found at path: %s", vulnRawData)
+		}
+
+		report, err := vulnerabilities.ProcessVulnerabilities(vulnRawData)
+		if err != nil {
+			log.Fatalf("Error processing vulnerabilities: %v", err)
+		}
+
+		vulnRisks := risk.AnalyzeVulnerabilities(report.Vulnerabilities)
+
+		err = risk.ExportVulnerabilitiesWithRisk(vulnRisks, vulnDataRiskScored)
+		if err != nil {
+			log.Fatalf("Error exporting vulnerability data: %v", err)
+		}
+
+		err = agent.AppendRiskJustifications(vulnDataRiskScored, vulnDataRiskJustified)
+		if err != nil {
+			log.Fatalf("Error: %v", err)
+		}
+
+		err = agent.GenerateOwnerReport(vulnDataRiskJustified, "../testdata/remediation-report-"+*ownerId+".txt", *ownerId)
+		if err != nil {
+			log.Fatalf("Error generating owner report: %v", err)
+		}
+
 	}
-
-	report, err := vulnerabilities.ProcessVulnerabilities(vulnFilePath)
-	if err != nil {
-		log.Fatalf("Error processing vulnerabilities: %v", err)
-	}
-
-	vulnRisks := risk.AnalyzeVulnerabilities(report.Vulnerabilities)
-
-	if err := risk.ExportVulnerabilitiesWithRisk(vulnRisks, vulnRiskFilePath); err != nil {
-		log.Fatalf("Error exporting vulnerability data: %v", err)
-	}
-
-	err = agent.EnhanceRiskJustifications(vulnRiskFilePath, vulnLlmReport)
-	if err != nil {
-		log.Fatalf("Error: %v", err)
-	}
-
 }

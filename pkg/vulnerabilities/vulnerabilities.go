@@ -12,8 +12,10 @@ type Vulnerability struct {
 	Severity         string `json:"severity"`
 	AssetName        string `json:"assetname"`
 	AssetCriticality string `json:"assetcriticality"`
+	AssetOs          string `json:"assetos"`
 	Environment      string `json:"environment"`
 	Url              string `json:"vulnurl"`
+	AssetOwner       string `json:"assetowner"`
 }
 
 type VulnerabilityReport struct {

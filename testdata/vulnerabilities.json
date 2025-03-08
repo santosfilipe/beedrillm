@@ -6,8 +6,10 @@
         "severity": "Critical",
         "assetname": "webserver1.intranet.techcompany.com",
         "assetcriticality": "High",
+        "assetos": "Oracle Linux 9",
         "environment": "Production",
-        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2023-46604"
+        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2023-46604",
+        "assetowner": "0001"
       },
       {
         "cve": "CVE-2023-3519",
@@ -15,8 +17,10 @@
         "severity": "High",
         "assetname": "appserver1.intranet.techcompany.com",
         "assetcriticality": "High",
+        "assetos": "Windows Server 2022",
         "environment": "PCI",
-        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2023-3519"
+        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2023-3519",
+        "assetowner": "0002"
       },
       {
         "cve": "CVE-2023-35078",
@@ -24,8 +28,10 @@
         "severity": "Medium",
         "assetname": "dbserver1.intranet.techcompany.com",
         "assetcriticality": "Critical",
+        "assetos": "Oracle Linux 9",
         "environment": "Production",
-        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2023-35078"
+        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2023-35078",
+        "assetowner": "0001"
       },
       {
         "cve": "CVE-2023-36052",
@@ -33,8 +39,10 @@
         "severity": "Low",
         "assetname": "winserver2.intranet.techcompany.com",
         "assetcriticality": "Medium",
+        "assetos": "Windows Server 2022",
         "environment": "Development",
-        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2023-36052"
+        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2023-36052",
+        "assetowner": "0002"
       },
       {
         "cve": "CVE-2023-38408",
@@ -42,8 +50,10 @@
         "severity": "High",
         "assetname": "apigateway02.intranet.techcompany.com",
         "assetcriticality": "High",
+        "assetos": "Windows Server 2022",
         "environment": "Production",
-        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2023-38408"
+        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2023-38408",
+        "assetowner": "0002"
       },
       {
         "cve": "CVE-2023-23397",
@@ -51,8 +61,10 @@
         "severity": "Critical",
         "assetname": "fecompute3.intranet.techcompany.com",
         "assetcriticality": "High",
+        "assetos": "Windows Server 2022",
         "environment": "PCI",
-        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2023-23397"
+        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2023-23397",
+        "assetowner": "0002"
       },
       {
         "cve": "CVE-2022-36934",
@@ -60,8 +72,10 @@
         "severity": "Medium",
         "assetname": "corporateappserver4.intranet.techcompany.com",
         "assetcriticality": "Critical",
+        "assetos": "Windows Server 2022",
         "environment": "Production",
-        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2022-36934"
+        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2022-36934",
+        "assetowner": "0002"
       },
       {
         "cve": "CVE-2022-30190",
@@ -69,8 +83,10 @@
         "severity": "Low",
         "assetname": "winserver9.intranet.techcompany.com",
         "assetcriticality": "Medium",
+        "assetos": "Windows Server 2022",
         "environment": "Development",
-        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2022-30190"
+        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2022-30190",
+        "assetowner": "0002"
       },
       {
         "cve": "CVE-2022-22965",
@@ -78,8 +94,10 @@
         "severity": "High",
         "assetname": "grafanaappserver1.intranet.techcompany.com",
         "assetcriticality": "High",
+        "assetos": "Oracle Linux 9",
         "environment": "Quality",
-        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2022-22965"
+        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2022-22965",
+        "assetowner": "0001"
       },
       {
         "cve": "CVE-2022-1388",
@@ -87,8 +105,10 @@
         "severity": "Critical",
         "assetname": "dbserver4.intranet.techcompany.com",
         "assetcriticality": "Critical",
+        "assetos": "Red Hat Enterprise Linux 9",
         "environment": "Production",
-        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2022-1388"
+        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2022-1388",
+        "assetowner": "0001"
       },
       {
         "cve": "CVE-2021-44228",
@@ -96,8 +116,10 @@
         "severity": "Medium",
         "assetname": "logappserver1.intranet.techcompany.com",
         "assetcriticality": "High",
+        "assetos": "Oracle Linux 9",
         "environment": "Production",
-        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2021-44228"
+        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2021-44228",
+        "assetowner": "0001"
       },
       {
         "cve": "CVE-2021-42237",
@@ -105,8 +127,10 @@
         "severity": "Low",
         "assetname": "grafanaappserver2.intranet.techcompany.com",
         "assetcriticality": "Medium",
+        "assetos": "Oracle Linux 9",
         "environment": "Quality",
-        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2021-42237"
+        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2021-42237",
+        "assetowner": "0001"
       },
       {
         "cve": "CVE-2021-34527",
@@ -114,8 +138,10 @@
         "severity": "High",
         "assetname": "fileserver3.intranet.techcompany.com",
         "assetcriticality": "High",
+        "assetos": "Windows Server 2022",
         "environment": "Production",
-        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2021-34527"
+        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2021-34527",
+        "assetowner": "0002"
       },
       {
         "cve": "CVE-2021-26855",
@@ -123,8 +149,10 @@
         "severity": "Critical",
         "assetname": "winserver4.intranet.techcompany.com",
         "assetcriticality": "Critical",
+        "assetos": "Windows Server 2022",
         "environment": "Production",
-        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2021-26855"
+        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2021-26855",
+        "assetowner": "0002"
       },
       {
         "cve": "CVE-2021-21972",
@@ -132,8 +160,10 @@
         "severity": "High",
         "assetname": "appserver5.intranet.techcompany.com",
         "assetcriticality": "High",
+        "assetos": "Windows Server 2022",
         "environment": "Development",
-        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2021-21972"
+        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2021-21972",
+        "assetowner": "0002"
       },
       {
         "cve": "CVE-2021-3156",
@@ -141,8 +171,10 @@
         "severity": "Medium",
         "assetname": "appserver10.intranet.techcompany.com",
         "assetcriticality": "High",
+        "assetos": "Oracle Linux 9",
         "environment": "PCI",
-        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2021-3156"
+        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2021-3156",
+        "assetowner": "0001"
       },
       {
         "cve": "CVE-2020-1472",
@@ -150,8 +182,10 @@
         "severity": "Low",
         "assetname": "winserver7.intranet.techcompany.com",
         "assetcriticality": "High",
+        "assetos": "Windows Server 2022",
         "environment": "Production",
-        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2020-1472"
+        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2020-1472",
+        "assetowner": "0002"
       },
       {
         "cve": "CVE-2019-19781",
@@ -159,8 +193,10 @@
         "severity": "High",
         "assetname": "fileserver5.intranet.techcompany.com",
         "assetcriticality": "High",
+        "assetos": "Windows Server 2022",
         "environment": "Quality",
-        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2019-19781"
+        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2019-19781",
+        "assetowner": "0002"
       },
       {
         "cve": "CVE-2019-0708",
@@ -168,8 +204,10 @@
         "severity": "Critical",
         "assetname": "winserver11.intranet.techcompany.com",
         "assetcriticality": "High",
+        "assetos": "Windows Server 2022",
         "environment": "Production",
-        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2019-0708"
+        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2019-0708",
+        "assetowner": "0002"
       },
       {
         "cve": "CVE-2018-13379",
@@ -177,8 +215,10 @@
         "severity": "Medium",
         "assetname": "loadbalancer2.intranet.techcompany.com",
         "assetcriticality": "Medium",
+        "assetos": "FortiOS",
         "environment": "Quality",
-        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2018-13379"
+        "vulnurl": "https://nvd.nist.gov/vuln/detail/CVE-2018-13379",
+        "assetowner": "0003"
       }
     ]
   }
