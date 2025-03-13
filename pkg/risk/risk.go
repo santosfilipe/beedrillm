@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/santosfilipe/beedrillm/pkg/vulnerabilities"
 )
@@ -51,13 +50,11 @@ type VulnerabilityWithRisk struct {
 
 type VulnerabilityRiskReport struct {
 	Vulnerabilities []VulnerabilityWithRisk `json:"vulnerabilities"`
-	GeneratedAt     string                  `json:"generated_at"`
 }
 
-func ExportVulnerabilitiesWithRisk(vulnRisks []VulnerabilityRisk, filePath string) error {
+func ExportVulnerabilitiesWithRiskScore(vulnRisks []VulnerabilityRisk, filePath string) (VulnerabilityRiskReport, error) {
 	exportData := VulnerabilityRiskReport{
 		Vulnerabilities: make([]VulnerabilityWithRisk, len(vulnRisks)),
-		GeneratedAt:     time.Now().Format(time.RFC3339),
 	}
 
 	for i, vr := range vulnRisks {
@@ -83,24 +80,24 @@ func ExportVulnerabilitiesWithRisk(vulnRisks []VulnerabilityRisk, filePath strin
 
 	jsonData, err := json.MarshalIndent(exportData, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to marshal vulnerability data to JSON: %w", err)
+		return VulnerabilityRiskReport{}, fmt.Errorf("failed to marshal vulnerability data to JSON: %w", err)
 	}
 
 	dir := filepath.Dir(filePath)
 	if dir != "." {
 		if err := os.MkdirAll(dir, 0755); err != nil {
-			return fmt.Errorf("failed to create output directory: %w", err)
+			return VulnerabilityRiskReport{}, fmt.Errorf("failed to create output directory: %w", err)
 		}
 	}
 
 	if err := os.WriteFile(filePath, jsonData, 0644); err != nil {
-		return fmt.Errorf("failed to write JSON data to file: %w", err)
+		return VulnerabilityRiskReport{}, fmt.Errorf("failed to write JSON data to file: %w", err)
 	}
 
-	return nil
+	return exportData, nil
 }
 
-func CalculateRisk(vuln vulnerabilities.Vulnerability) VulnerabilityRisk {
+func calculateRisk(vuln vulnerabilities.Vulnerability) VulnerabilityRisk {
 	severity := strings.ToLower(vuln.Severity)
 	assetCriticality := strings.ToLower(vuln.AssetCriticality)
 	environment := strings.ToLower(vuln.Environment)
@@ -173,11 +170,11 @@ func CalculateRisk(vuln vulnerabilities.Vulnerability) VulnerabilityRisk {
 	}
 }
 
-func AnalyzeVulnerabilities(vulns []vulnerabilities.Vulnerability) []VulnerabilityRisk {
+func RiskScoring(vulns []vulnerabilities.Vulnerability) []VulnerabilityRisk {
 	result := make([]VulnerabilityRisk, len(vulns))
 
 	for i, vuln := range vulns {
-		result[i] = CalculateRisk(vuln)
+		result[i] = calculateRisk(vuln)
 	}
 
 	return result

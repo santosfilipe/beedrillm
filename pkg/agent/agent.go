@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
-	"sort"
 	"strings"
-	"time"
+
+	"github.com/santosfilipe/beedrillm/pkg/risk"
 )
 
 type ClaudeConfig struct {
@@ -48,61 +49,25 @@ type ClaudeResponse struct {
 	} `json:"error,omitempty"`
 }
 
-type VulnerabilityWithRisk struct {
-	CVE              string `json:"cve"`
-	Description      string `json:"description"`
-	Severity         string `json:"severity"`
-	Url              string `json:"vulnurl"`
-	AssetName        string `json:"assetname"`
-	AssetOwner       string `json:"assetowner"`
-	AssetCriticality string `json:"assetcriticality"`
-	AssetOs          string `json:"assetos"`
-	Environment      string `json:"environment"`
-	RiskLevel        string `json:"risk_level"`
-	RiskScore        int    `json:"risk_score"`
-	Justification    string `json:"risk_justification"`
+var Logger *slog.Logger
+
+func init() {
+	Logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{AddSource: true}))
 }
 
-type RiskDataFile struct {
-	Vulnerabilities []VulnerabilityWithRisk `json:"vulnerabilities"`
-	Summary         map[string]int          `json:"risk_summary"`
-	GeneratedAt     string                  `json:"generated_at"`
-}
-
-type RiskScore int
-
-type RiskLevel string
-
-const (
-	Critical RiskLevel = "Critical"
-	High     RiskLevel = "High"
-	Medium   RiskLevel = "Medium"
-	Low      RiskLevel = "Low"
-	Info     RiskLevel = "Informational"
-)
-
-func AppendRiskJustifications(inputFilePath, outputFilePath, apiKey string) error {
-	data, err := os.ReadFile(inputFilePath)
-	if err != nil {
-		return fmt.Errorf("failed to read input file: %w", err)
-	}
-
-	var riskData RiskDataFile
-	if err := json.Unmarshal(data, &riskData); err != nil {
-		return fmt.Errorf("failed to parse input JSON: %w", err)
-	}
-
-	fmt.Printf("Processing %d vulnerabilities with Claude...\n", len(riskData.Vulnerabilities))
+func GenerateRiskJustification(vulnRisks risk.VulnerabilityRiskReport, outputFilePath, apiKey string) (risk.VulnerabilityRiskReport, error) {
+	Logger.Info("risk_justification data enrichment with Claude started.", "number_of_vulnerabilities", len(vulnRisks.Vulnerabilities))
 
 	config := DefaultClaudeConfig(apiKey)
 	processedCount := 0
 
-	for i := range riskData.Vulnerabilities {
-		vuln := &riskData.Vulnerabilities[i]
+	for i := range vulnRisks.Vulnerabilities {
+
+		vuln := &vulnRisks.Vulnerabilities[i]
 
 		riskJustification, err := getRiskJustification(config, vuln)
 		if err != nil {
-			fmt.Printf("Warning: Failed to enhance justification for CVE %s: %v\n", vuln.CVE, err)
+			Logger.Warn("Failed to enrich risk_justification.", "cve", vuln.CVE, "err", err)
 			continue
 		}
 
@@ -110,28 +75,26 @@ func AppendRiskJustifications(inputFilePath, outputFilePath, apiKey string) erro
 		processedCount++
 
 		if processedCount%5 == 0 {
-			fmt.Printf("Processed %d/%d vulnerabilities...\n", processedCount, len(riskData.Vulnerabilities))
+			Logger.Info("risk_justification enrichment is ongoing.", "processed_count", processedCount, "total", len(vulnRisks.Vulnerabilities))
 		}
 	}
 
-	riskData.GeneratedAt = time.Now().Format(time.RFC3339)
-
-	outputJSON, err := json.MarshalIndent(riskData, "", "  ")
+	outputJSON, err := json.MarshalIndent(vulnRisks, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to marshal updated data: %w", err)
+		return risk.VulnerabilityRiskReport{}, fmt.Errorf("failed to marshal updated data: %w", err)
 	}
 
 	if err := os.WriteFile(outputFilePath, outputJSON, 0644); err != nil {
-		return fmt.Errorf("failed to write output file: %w", err)
+		return risk.VulnerabilityRiskReport{}, fmt.Errorf("failed to write output file: %w", err)
 	}
 
-	fmt.Printf("Successfully enhanced %d/%d vulnerability justifications\n", processedCount, len(riskData.Vulnerabilities))
-	fmt.Printf("Enhanced data written to %s\n", outputFilePath)
+	Logger.Info("risk_justification data enrichment completed.", "number_vulnerabilities_enriched", processedCount, "total", len(vulnRisks.Vulnerabilities))
+	Logger.Info("risk_justification enriched data JSON file created.", "file_path", outputFilePath)
 
-	return nil
+	return vulnRisks, nil
 }
 
-func getRiskJustification(config ClaudeConfig, vuln *VulnerabilityWithRisk) (string, error) {
+func getRiskJustification(config ClaudeConfig, vuln *risk.VulnerabilityWithRisk) (string, error) {
 	prompt := fmt.Sprintf(`Analyze the following vulnerability and provide a clear, technical explanation for its risk assessment. Focus on explaining why the calculated risk level and score are appropriate based on the vulnerability details, asset criticality, and environment.
 
 Vulnerability Details:
@@ -214,88 +177,86 @@ Provide a 2-3 sentence technical explanation for why this risk level is appropri
 	return claudeResp.Content[0].Text, nil
 }
 
-func GetRiskLevelPriority(level RiskLevel) int {
-	switch level {
-	case Critical:
-		return 5
-	case High:
-		return 4
-	case Medium:
-		return 3
-	case Low:
-		return 2
-	case Info:
-		return 1
-	default:
-		return 0
+func GenerateOwnerReportv2(vulnRisks risk.VulnerabilityRiskReport, outputFilePath, ownerName, apiKey string) error {
+	ownerVulnerabilities := filterVulnerabilitiesByOwner(vulnRisks.Vulnerabilities, ownerName)
+
+	if len(ownerVulnerabilities) == 0 {
+		return fmt.Errorf("no vulnerabilities found for owner: %s", ownerName)
 	}
-}
 
-func EnvironmentPriority(env string) int {
-	env = strings.ToLower(env)
-	switch env {
-	case "pci", "pci-dss":
-		return 5
-	case "production", "prod":
-		return 4
-	case "staging", "stage":
-		return 3
-	case "quality", "qa":
-		return 2
-	case "development", "dev":
-		return 1
-	default:
-		return 0
+	criticalAndHighVulns := []risk.VulnerabilityWithRisk{}
+
+	for _, vuln := range ownerVulnerabilities {
+		riskLevel := risk.RiskLevel(vuln.RiskLevel)
+		if riskLevel == risk.Critical || riskLevel == risk.High {
+			criticalAndHighVulns = append(criticalAndHighVulns, vuln)
+		}
 	}
-}
 
-func AssetCriticalityPriority(criticality string) int {
-	criticality = strings.ToLower(criticality)
-	switch criticality {
-	case "critical":
-		return 4
-	case "high":
-		return 3
-	case "medium":
-		return 2
-	case "low":
-		return 1
-	default:
-		return 0
+	config := DefaultClaudeConfig(apiKey)
+
+	fmt.Printf("Generating vulnerability report with Claude for owner %s...\n", ownerName)
+
+	report, err := generateOwnerReport(criticalAndHighVulns, ownerName, config)
+	if err != nil {
+		return fmt.Errorf("failed to generate report with Claude: %w", err)
 	}
+
+	if err := os.WriteFile(outputFilePath, []byte(report), 0644); err != nil {
+		return fmt.Errorf("failed to write output file: %w", err)
+	}
+
+	fmt.Printf("Personalized vulnerability report for %s generated at %s\n", ownerName, outputFilePath)
+
+	return nil
 }
 
-func sortVulnerabilitiesByPriority(vulns *[]VulnerabilityWithRisk) {
-	sort.SliceStable(*vulns, func(i, j int) bool {
-		riskLevelI := RiskLevel((*vulns)[i].RiskLevel)
-		riskLevelJ := RiskLevel((*vulns)[j].RiskLevel)
-		levelPriorityI := GetRiskLevelPriority(riskLevelI)
-		levelPriorityJ := GetRiskLevelPriority(riskLevelJ)
+func GenerateOwnerReportWithCache(inputFilePath, outputFilePath, ownerName, apiKey string) error {
+	data, err := os.ReadFile(inputFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to read input file %s: %w", inputFilePath, err)
+	}
 
-		if levelPriorityI != levelPriorityJ {
-			return levelPriorityI > levelPriorityJ
+	var riskData risk.VulnerabilityRiskReport
+	if err := json.Unmarshal(data, &riskData); err != nil {
+		return fmt.Errorf("failed to parse JSON data: %w", err)
+	}
+
+	ownerVulnerabilities := filterVulnerabilitiesByOwner(riskData.Vulnerabilities, ownerName)
+
+	if len(ownerVulnerabilities) == 0 {
+		return fmt.Errorf("no vulnerabilities found for owner: %s", ownerName)
+	}
+
+	criticalAndHighVulns := []risk.VulnerabilityWithRisk{}
+
+	for _, vuln := range ownerVulnerabilities {
+		riskLevel := risk.RiskLevel(vuln.RiskLevel)
+		if riskLevel == risk.Critical || riskLevel == risk.High {
+			criticalAndHighVulns = append(criticalAndHighVulns, vuln)
 		}
+	}
 
-		if (*vulns)[i].RiskScore != (*vulns)[j].RiskScore {
-			return (*vulns)[i].RiskScore > (*vulns)[j].RiskScore
-		}
+	config := DefaultClaudeConfig(apiKey)
 
-		envPriorityI := EnvironmentPriority((*vulns)[i].Environment)
-		envPriorityJ := EnvironmentPriority((*vulns)[j].Environment)
+	fmt.Printf("Generating vulnerability report with Claude for owner %s...\n", ownerName)
 
-		if envPriorityI != envPriorityJ {
-			return envPriorityI > envPriorityJ
-		}
+	report, err := generateOwnerReport(criticalAndHighVulns, ownerName, config)
+	if err != nil {
+		return fmt.Errorf("failed to generate report with Claude: %w", err)
+	}
 
-		assetPriorityI := AssetCriticalityPriority((*vulns)[i].AssetCriticality)
-		assetPriorityJ := AssetCriticalityPriority((*vulns)[j].AssetCriticality)
+	if err := os.WriteFile(outputFilePath, []byte(report), 0644); err != nil {
+		return fmt.Errorf("failed to write output file: %w", err)
+	}
 
-		return assetPriorityI > assetPriorityJ
-	})
+	fmt.Printf("Personalized vulnerability report for %s generated at %s\n", ownerName, outputFilePath)
+
+	return nil
 }
 
-func filterVulnerabilitiesByOwner(vulns []VulnerabilityWithRisk, ownerName string) []VulnerabilityWithRisk {
-	result := []VulnerabilityWithRisk{}
+func filterVulnerabilitiesByOwner(vulns []risk.VulnerabilityWithRisk, ownerName string) []risk.VulnerabilityWithRisk {
+	result := []risk.VulnerabilityWithRisk{}
 
 	hasOwnershipInfo := false
 	for _, vuln := range vulns {
@@ -322,53 +283,7 @@ func filterVulnerabilitiesByOwner(vulns []VulnerabilityWithRisk, ownerName strin
 	return result
 }
 
-func GenerateOwnerReport(inputFilePath, outputFilePath, ownerName, apiKey string) error {
-	data, err := os.ReadFile(inputFilePath)
-	if err != nil {
-		return fmt.Errorf("failed to read input file %s: %w", inputFilePath, err)
-	}
-
-	var riskData RiskDataFile
-	if err := json.Unmarshal(data, &riskData); err != nil {
-		return fmt.Errorf("failed to parse JSON data: %w", err)
-	}
-
-	ownerVulnerabilities := filterVulnerabilitiesByOwner(riskData.Vulnerabilities, ownerName)
-
-	if len(ownerVulnerabilities) == 0 {
-		return fmt.Errorf("no vulnerabilities found for owner: %s", ownerName)
-	}
-
-	criticalAndHighVulns := []VulnerabilityWithRisk{}
-
-	for _, vuln := range ownerVulnerabilities {
-		riskLevel := RiskLevel(vuln.RiskLevel)
-		if riskLevel == Critical || riskLevel == High {
-			criticalAndHighVulns = append(criticalAndHighVulns, vuln)
-		}
-	}
-
-	sortVulnerabilitiesByPriority(&criticalAndHighVulns)
-
-	config := DefaultClaudeConfig(apiKey)
-
-	fmt.Printf("Generating vulnerability report with Claude for owner %s...\n", ownerName)
-
-	report, err := generateOwnerReport(criticalAndHighVulns, ownerName, config)
-	if err != nil {
-		return fmt.Errorf("failed to generate report with Claude: %w", err)
-	}
-
-	if err := os.WriteFile(outputFilePath, []byte(report), 0644); err != nil {
-		return fmt.Errorf("failed to write output file: %w", err)
-	}
-
-	fmt.Printf("Personalized vulnerability report for %s generated at %s\n", ownerName, outputFilePath)
-
-	return nil
-}
-
-func generateOwnerReport(vulns []VulnerabilityWithRisk, ownerName string, config ClaudeConfig) (string, error) {
+func generateOwnerReport(vulns []risk.VulnerabilityWithRisk, ownerName string, config ClaudeConfig) (string, error) {
 
 	vulnsJSON, err := json.MarshalIndent(vulns, "", "  ")
 	if err != nil {
@@ -376,7 +291,7 @@ func generateOwnerReport(vulns []VulnerabilityWithRisk, ownerName string, config
 	}
 
 	prompt := fmt.Sprintf(`Generate a comprehensive and actionable vulnerability remediation report for the asset owner team named "%s". 
-The report should be formatted in plain text and present the vulnerabilities in order of remediation priority.
+The report should be formatted using markdown and present the vulnerabilities in order of remediation priority.
 
 Below is the JSON data for %d vulnerabilities assigned to this owner:
 
@@ -399,8 +314,10 @@ The report should include:
    - Key details (risk level, score, environment, asset criticality)
    - Risk assessment explanation
    - Specific, actionable remediation guidance based on the vulnerability type. Provide the official source of the remediation recommendation.
+
+Always use a numbered list to structure the vulnerabilities from most critical to least critical.
    
-The tone should be professional but urgent for critical issues. Do not use markdown syntax, use strictly simple plain text formatting with lists and bullet points.
+The tone should be professional but urgent for critical issues.
 
 Make the report comprehensive yet focused on the most important information for the team to take action.`,
 		ownerName, len(vulns), string(vulnsJSON))
