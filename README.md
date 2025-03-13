@@ -1,1 +1,3 @@
-go run cmd/main.go remediation-owner-report --owner "0001" --api-key "sampleapikey"
+cd cmd
+
+go run main.go agent --owner="0001" --api-key="apisamplekey" (--otherArgs)
