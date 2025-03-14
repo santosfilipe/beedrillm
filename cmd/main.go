@@ -44,20 +44,20 @@ func main() {
 		if *ownerReportOnly {
 			err := agent.GenerateOwnerReportWithCache(vulnDataRiskJustified, "../testdata/remediation-report-"+*ownerId+".md", *ownerId, *apiKey)
 			if err != nil {
-				logger.Error("Error generating vulnerability remediation report file for owner %s.", *ownerId, slog.String("err", err.Error()))
+				logger.Error("Failed to generate report with Claude.", "owner", ownerId, "error", err)
 				os.Exit(1)
 			}
 		}
 
 		if *riskScoringOnly {
 			if _, err := os.Stat(vulnRawData); os.IsNotExist(err) {
-				logger.Error("Raw vulnerability JSON file not found at path: %s.", vulnRawData, slog.String("err", err.Error()))
+				logger.Error("Raw vulnerability JSON file not found.", "file_path", vulnRawData, "error", err)
 				os.Exit(1)
 			}
 
 			rawDataReport, err := vulnerabilities.ProcessVulnerabilities(vulnRawData)
 			if err != nil {
-				logger.Error("Error processing raw vulnerability JSON file data.", slog.String("err", err.Error()))
+				logger.Error("ProcessVulnerabilities() failed.", "error", err)
 				os.Exit(1)
 			}
 
@@ -65,7 +65,7 @@ func main() {
 
 			_, err = risk.ExportVulnerabilitiesWithRiskScore(vulnRisks, vulnDataRiskScored)
 			if err != nil {
-				logger.Error("Error while exporting the vulnerability data with risk scoring JSON file.", slog.String("err", err.Error()))
+				logger.Error("risk.ExportVulnerabilitiesWithRiskScore() failed.", "error", err)
 				os.Exit(1)
 			}
 		}
@@ -78,7 +78,7 @@ func main() {
 
 			rawDataReport, err := vulnerabilities.ProcessVulnerabilities(vulnRawData)
 			if err != nil {
-				logger.Error("Error processing raw vulnerability JSON file data.", slog.String("err", err.Error()))
+				logger.Error("ProcessVulnerabilities() failed.", "error", err)
 				os.Exit(1)
 			}
 
@@ -86,13 +86,13 @@ func main() {
 
 			vulnRiskScoredReport, err := risk.ExportVulnerabilitiesWithRiskScore(vulnRisks, vulnDataRiskScored)
 			if err != nil {
-				logger.Error("Error while exporting the vulnerability data with risk scoring JSON file.", slog.String("err", err.Error()))
+				logger.Error("risk.ExportVulnerabilitiesWithRiskScore() failed.", "error", err)
 				os.Exit(1)
 			}
 
-			_, err = agent.GenerateRiskJustification(vulnRiskScoredReport, vulnDataRiskJustified, *apiKey)
+			_, err = agent.GenerateBatchRiskJustification(vulnRiskScoredReport, vulnDataRiskJustified, *apiKey)
 			if err != nil {
-				logger.Error("Error while enriching the vulnerability data with risk justification.", slog.String("err", err.Error()))
+				logger.Error("agent.GenerateBatchRiskJustification() failed.", "error", err)
 				os.Exit(1)
 			}
 		}
@@ -105,7 +105,7 @@ func main() {
 
 			rawDataReport, err := vulnerabilities.ProcessVulnerabilities(vulnRawData)
 			if err != nil {
-				logger.Error("Error processing raw vulnerability JSON file data.", slog.String("err", err.Error()))
+				logger.Error("ProcessVulnerabilities() failed.", "error", err)
 				os.Exit(1)
 			}
 
@@ -113,19 +113,19 @@ func main() {
 
 			vulnRiskScoredReport, err := risk.ExportVulnerabilitiesWithRiskScore(vulnRisks, vulnDataRiskScored)
 			if err != nil {
-				logger.Error("Error while exporting the vulnerability data with risk scoring JSON file.", slog.String("err", err.Error()))
+				logger.Error("risk.ExportVulnerabilitiesWithRiskScore() failed.", "error", err)
 				os.Exit(1)
 			}
 
-			vulnsRiskJustification, err := agent.GenerateRiskJustification(vulnRiskScoredReport, vulnDataRiskJustified, *apiKey)
+			vulnsRiskJustification, err := agent.GenerateBatchRiskJustification(vulnRiskScoredReport, vulnDataRiskJustified, *apiKey)
 			if err != nil {
-				logger.Error("Error while enriching the vulnerability data with risk justification.", slog.String("err", err.Error()))
+				logger.Error("agent.GenerateBatchRiskJustification() failed.", "error", err)
 				os.Exit(1)
 			}
 
 			err = agent.GenerateOwnerReportv2(vulnsRiskJustification, "../testdata/remediation-report-"+*ownerId+".md", *ownerId, *apiKey)
 			if err != nil {
-				logger.Error("Error while generating the vulnerability remediation report file for owner %s.", *ownerId, slog.String("err", err.Error()))
+				logger.Error("agent.GenerateOwnerReportv2() failed.", "error", err)
 				os.Exit(1)
 			}
 		}

@@ -3,6 +3,7 @@ package risk
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -52,7 +53,15 @@ type VulnerabilityRiskReport struct {
 	Vulnerabilities []VulnerabilityWithRisk `json:"vulnerabilities"`
 }
 
+var Logger *slog.Logger
+
+func init() {
+	Logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{AddSource: true}))
+}
+
 func ExportVulnerabilitiesWithRiskScore(vulnRisks []VulnerabilityRisk, filePath string) (VulnerabilityRiskReport, error) {
+	Logger.Info("ExportVulnerabilitiesWithRiskScore().")
+
 	exportData := VulnerabilityRiskReport{
 		Vulnerabilities: make([]VulnerabilityWithRisk, len(vulnRisks)),
 	}
@@ -80,17 +89,20 @@ func ExportVulnerabilitiesWithRiskScore(vulnRisks []VulnerabilityRisk, filePath 
 
 	jsonData, err := json.MarshalIndent(exportData, "", "  ")
 	if err != nil {
+		Logger.Error("Failed to marshal vulnerability data to JSON.", "error", err)
 		return VulnerabilityRiskReport{}, fmt.Errorf("failed to marshal vulnerability data to JSON: %w", err)
 	}
 
 	dir := filepath.Dir(filePath)
 	if dir != "." {
 		if err := os.MkdirAll(dir, 0755); err != nil {
+			Logger.Error("Failed to create output directory.", "error", err)
 			return VulnerabilityRiskReport{}, fmt.Errorf("failed to create output directory: %w", err)
 		}
 	}
 
 	if err := os.WriteFile(filePath, jsonData, 0644); err != nil {
+		Logger.Error("Failed to write JSON data to file.", "error", err)
 		return VulnerabilityRiskReport{}, fmt.Errorf("failed to write JSON data to file: %w", err)
 	}
 
@@ -175,6 +187,7 @@ func RiskScoring(vulns []vulnerabilities.Vulnerability) []VulnerabilityRisk {
 
 	for i, vuln := range vulns {
 		result[i] = calculateRisk(vuln)
+		Logger.Info("RiskScoring() -> calculateRisk()", "cve", vuln.CVE, "asset_owner", vuln.AssetOwner)
 	}
 
 	return result

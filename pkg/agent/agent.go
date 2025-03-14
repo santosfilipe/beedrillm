@@ -55,75 +55,99 @@ func init() {
 	Logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{AddSource: true}))
 }
 
-func GenerateRiskJustification(vulnRisks risk.VulnerabilityRiskReport, outputFilePath, apiKey string) (risk.VulnerabilityRiskReport, error) {
-	Logger.Info("risk_justification data enrichment with Claude started.", "number_of_vulnerabilities", len(vulnRisks.Vulnerabilities))
+func GenerateBatchRiskJustification(vulnRisks risk.VulnerabilityRiskReport, outputFilePath, apiKey string) (risk.VulnerabilityRiskReport, error) {
+	Logger.Info("batch_risk_justification data enrichment with Claude started.",
+		"number_of_vulnerabilities", len(vulnRisks.Vulnerabilities))
 
 	config := DefaultClaudeConfig(apiKey)
-	processedCount := 0
+	config.MaxTokens = 4000
 
-	for i := range vulnRisks.Vulnerabilities {
-
-		vuln := &vulnRisks.Vulnerabilities[i]
-
-		riskJustification, err := getRiskJustification(config, vuln)
-		if err != nil {
-			Logger.Warn("Failed to enrich risk_justification.", "cve", vuln.CVE, "err", err)
-			continue
-		}
-
-		vuln.Justification = riskJustification
-		processedCount++
-
-		if processedCount%5 == 0 {
-			Logger.Info("risk_justification enrichment is ongoing.", "processed_count", processedCount, "total", len(vulnRisks.Vulnerabilities))
-		}
+	enrichedVulns, err := getBatchRiskJustifications(config, vulnRisks.Vulnerabilities)
+	if err != nil {
+		Logger.Error("Failed to enrich batch risk justifications.", "error", err)
+		return risk.VulnerabilityRiskReport{}, fmt.Errorf("failed to enrich batch risk justifications: %w", err)
 	}
+
+	vulnRisks.Vulnerabilities = enrichedVulns
 
 	outputJSON, err := json.MarshalIndent(vulnRisks, "", "  ")
 	if err != nil {
+		Logger.Error("Failed to marshal updated data.", "error", err)
 		return risk.VulnerabilityRiskReport{}, fmt.Errorf("failed to marshal updated data: %w", err)
 	}
 
 	if err := os.WriteFile(outputFilePath, outputJSON, 0644); err != nil {
+		Logger.Error("Failed to write output file.", "error", err)
 		return risk.VulnerabilityRiskReport{}, fmt.Errorf("failed to write output file: %w", err)
 	}
 
-	Logger.Info("risk_justification data enrichment completed.", "number_vulnerabilities_enriched", processedCount, "total", len(vulnRisks.Vulnerabilities))
+	Logger.Info("batch_risk_justification data enrichment completed.",
+		"number_vulnerabilities_enriched", len(vulnRisks.Vulnerabilities))
 	Logger.Info("risk_justification enriched data JSON file created.", "file_path", outputFilePath)
 
 	return vulnRisks, nil
 }
 
-func getRiskJustification(config ClaudeConfig, vuln *risk.VulnerabilityWithRisk) (string, error) {
-	prompt := fmt.Sprintf(`Analyze the following vulnerability and provide a clear, technical explanation for its risk assessment. Focus on explaining why the calculated risk level and score are appropriate based on the vulnerability details, asset criticality, and environment.
+type ClaudeBatchResponse struct {
+	Vulnerabilities []struct {
+		CVE           string `json:"cve"`
+		Justification string `json:"justification"`
+	} `json:"vulnerabilities"`
+}
 
-Vulnerability Details:
-- CVE: %s
-- Description: %s
-- Severity: %s
-- Url: %s
-- Asset Name: %s
-- Asset Owner: %s
-- Asset Criticality: %s
-- Asset OS: %s
-- Environment: %s
-- Calculated Risk Level: %s
-- Risk Score: %d
+func getBatchRiskJustifications(config ClaudeConfig, vulns []risk.VulnerabilityWithRisk) ([]risk.VulnerabilityWithRisk, error) {
+	vulnData := make([]map[string]interface{}, len(vulns))
+	for i, vuln := range vulns {
+		vulnData[i] = map[string]interface{}{
+			"cve":              vuln.CVE,
+			"description":      vuln.Description,
+			"severity":         vuln.Severity,
+			"url":              vuln.Url,
+			"assetName":        vuln.AssetName,
+			"assetOwner":       vuln.AssetOwner,
+			"assetCriticality": vuln.AssetCriticality,
+			"assetOs":          vuln.AssetOs,
+			"environment":      vuln.Environment,
+			"riskLevel":        vuln.RiskLevel,
+			"riskScore":        vuln.RiskScore,
+		}
+	}
 
-Provide a 2-3 sentence technical explanation for why this risk level is appropriate. Identify specific factors that increased or decreased the risk. Be specific about how the asset criticality and environment context influenced the risk calculation. Your explanation should be factual, precise, and actionable for security professionals. Don't speculate on potential attack vectors but rather on the overall vulnerability and asset context influence on the final risk score. Generate only plain text without markdown formatting.`,
-		vuln.CVE,
-		vuln.Description,
-		vuln.Severity,
-		vuln.Url,
-		vuln.AssetName,
-		vuln.AssetOwner,
-		vuln.AssetCriticality,
-		vuln.AssetOs,
-		vuln.Environment,
-		vuln.RiskLevel,
-		vuln.RiskScore)
+	vulnJSON, err := json.Marshal(vulnData)
+	if err != nil {
+		Logger.Error("Error marshaling vulnerability data.", "error", err)
+		return nil, err
+	}
 
-	// Prepare request to Claude API
+	prompt := fmt.Sprintf(`You are tasked with analyzing multiple cybersecurity vulnerabilities and providing risk justifications for each one.
+
+Below is a JSON array containing %d vulnerabilities with their risk scores and levels. For each vulnerability, provide a clear, technical explanation (2-3 sentences) for why its calculated risk level is appropriate.
+
+The explanation should:
+1. Identify specific factors that increased or decreased the risk
+2. Consider how asset criticality and environment influenced the risk calculation
+3. Be factual, precise, and actionable for security professionals
+4. Focus on the vulnerability and asset context's influence on the final risk score
+
+DO NOT speculate on potential attack vectors.
+DO NOT use markdown formatting.
+Keep each justification concise (2-3 sentences).
+
+Vulnerability data:
+%s
+
+Respond with a JSON array in the following format:
+{
+  "vulnerabilities": [
+    {
+      "cve": "CVE-XXXX-XXXXX",
+      "justification": "Your technical explanation here..."
+    },
+    ...
+  ]
+}
+`, len(vulns), string(vulnJSON))
+
 	requestBody := ClaudeRequest{
 		Model:     config.ModelName,
 		MaxTokens: config.MaxTokens,
@@ -137,12 +161,14 @@ Provide a 2-3 sentence technical explanation for why this risk level is appropri
 
 	requestJSON, err := json.Marshal(requestBody)
 	if err != nil {
-		return "", fmt.Errorf("error marshaling request: %w", err)
+		Logger.Error("Error marshaling data.", "error", err)
+		return nil, err
 	}
 
 	req, err := http.NewRequest("POST", config.APIBaseURL, bytes.NewBuffer(requestJSON))
 	if err != nil {
-		return "", fmt.Errorf("error creating request: %w", err)
+		Logger.Error("Error creating request.", "error", err)
+		return nil, err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -152,29 +178,53 @@ Provide a 2-3 sentence technical explanation for why this risk level is appropri
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("error sending request to Claude API: %w", err)
+		Logger.Error("Error sending request to Claude API.", "error", err)
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("error reading response: %w", err)
+		Logger.Error("Error reading response.", "error", err)
+		return nil, err
 	}
 
 	var claudeResp ClaudeResponse
 	if err := json.Unmarshal(body, &claudeResp); err != nil {
-		return "", fmt.Errorf("error parsing response: %w", err)
+		Logger.Error("Error parsing Claude response.", "error", err)
+		return nil, err
 	}
 
 	if claudeResp.Error != nil {
-		return "", fmt.Errorf("claude API error: %s", claudeResp.Error.Message)
+		Logger.Error("Claude API error.", "error", err)
+		return nil, fmt.Errorf("%s", claudeResp.Error.Message)
 	}
 
 	if len(claudeResp.Content) == 0 {
-		return "", fmt.Errorf("empty response from Claude API")
+		Logger.Error("Empty response from Claude API.", "error", err)
+		return nil, fmt.Errorf("empty response from Claude API")
 	}
 
-	return claudeResp.Content[0].Text, nil
+	var batchResponse ClaudeBatchResponse
+	if err := json.Unmarshal([]byte(claudeResp.Content[0].Text), &batchResponse); err != nil {
+		Logger.Error("Error parsing batch response JSON.", "error", err)
+		return nil, err
+	}
+
+	justificationMap := make(map[string]string, len(batchResponse.Vulnerabilities))
+	for _, item := range batchResponse.Vulnerabilities {
+		justificationMap[item.CVE] = item.Justification
+	}
+
+	for i := range vulns {
+		if justification, ok := justificationMap[vulns[i].CVE]; ok {
+			vulns[i].Justification = justification
+		} else {
+			Logger.Error("No justification generated for vulnerability", "cve", vulns[i].CVE)
+		}
+	}
+
+	return vulns, nil
 }
 
 func GenerateOwnerReportv2(vulnRisks risk.VulnerabilityRiskReport, outputFilePath, ownerName, apiKey string) error {
@@ -214,17 +264,24 @@ func GenerateOwnerReportv2(vulnRisks risk.VulnerabilityRiskReport, outputFilePat
 func GenerateOwnerReportWithCache(inputFilePath, outputFilePath, ownerName, apiKey string) error {
 	data, err := os.ReadFile(inputFilePath)
 	if err != nil {
-		return fmt.Errorf("failed to read input file %s: %w", inputFilePath, err)
+		Logger.Error("Failed to read input file.",
+			"file_path", inputFilePath,
+			"error", err)
+		return fmt.Errorf("failed to read input file: %w", err)
 	}
 
 	var riskData risk.VulnerabilityRiskReport
 	if err := json.Unmarshal(data, &riskData); err != nil {
+		Logger.Error("Failed to parse JSON data.",
+			"error", err)
 		return fmt.Errorf("failed to parse JSON data: %w", err)
 	}
 
 	ownerVulnerabilities := filterVulnerabilitiesByOwner(riskData.Vulnerabilities, ownerName)
 
 	if len(ownerVulnerabilities) == 0 {
+		Logger.Error("No vulnerabilities found for owner.",
+			"owner", ownerName)
 		return fmt.Errorf("no vulnerabilities found for owner: %s", ownerName)
 	}
 
@@ -239,18 +296,26 @@ func GenerateOwnerReportWithCache(inputFilePath, outputFilePath, ownerName, apiK
 
 	config := DefaultClaudeConfig(apiKey)
 
-	fmt.Printf("Generating vulnerability report with Claude for owner %s...\n", ownerName)
+	Logger.Info("Generating vulnerability report with Claude for owner.", "owner", ownerName)
 
 	report, err := generateOwnerReport(criticalAndHighVulns, ownerName, config)
 	if err != nil {
-		return fmt.Errorf("failed to generate report with Claude: %w", err)
+		Logger.Error("Failed to generate report with Claude.",
+			"owner", ownerName,
+			"error", err)
+		return fmt.Errorf("failed to generate report with Claude for owner: %s, %w", ownerName, err)
 	}
 
 	if err := os.WriteFile(outputFilePath, []byte(report), 0644); err != nil {
-		return fmt.Errorf("failed to write output file: %w", err)
+		Logger.Error("failed to write output file",
+			"file_path", outputFilePath,
+			"error", err)
+		return fmt.Errorf("failed to write output file: %s, %w", outputFilePath, err)
 	}
 
-	fmt.Printf("Personalized vulnerability report for %s generated at %s\n", ownerName, outputFilePath)
+	Logger.Info("Personalized vulnerability report generated.",
+		"owner", ownerName,
+		"file_path", outputFilePath)
 
 	return nil
 }
@@ -284,9 +349,9 @@ func filterVulnerabilitiesByOwner(vulns []risk.VulnerabilityWithRisk, ownerName 
 }
 
 func generateOwnerReport(vulns []risk.VulnerabilityWithRisk, ownerName string, config ClaudeConfig) (string, error) {
-
 	vulnsJSON, err := json.MarshalIndent(vulns, "", "  ")
 	if err != nil {
+		Logger.Error("Error marshalling JSON.", "error", err)
 		return "", fmt.Errorf("error marshaling vulnerabilities: %w", err)
 	}
 
@@ -335,11 +400,13 @@ Make the report comprehensive yet focused on the most important information for 
 
 	requestJSON, err := json.Marshal(requestBody)
 	if err != nil {
+		Logger.Error("Error marshalling request.", "error", err)
 		return "", fmt.Errorf("error marshaling request: %w", err)
 	}
 
 	req, err := http.NewRequest("POST", config.APIBaseURL, bytes.NewBuffer(requestJSON))
 	if err != nil {
+		Logger.Error("Error creating request.", "error", err)
 		return "", fmt.Errorf("error creating request: %w", err)
 	}
 
@@ -350,25 +417,30 @@ Make the report comprehensive yet focused on the most important information for 
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
+		Logger.Error("Error sending request to Claude API.", "error", err)
 		return "", fmt.Errorf("error sending request to Claude API: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		Logger.Error("Error reading response.", "error", err)
 		return "", fmt.Errorf("error reading response: %w", err)
 	}
 
 	var claudeResp ClaudeResponse
 	if err := json.Unmarshal(body, &claudeResp); err != nil {
+		Logger.Error("Error parsing Claude API response.", "error", err)
 		return "", fmt.Errorf("error parsing response: %w", err)
 	}
 
 	if claudeResp.Error != nil {
+		Logger.Error("Claude API Error.", "error", err)
 		return "", fmt.Errorf("claude API error: %s", claudeResp.Error.Message)
 	}
 
 	if len(claudeResp.Content) == 0 {
+		Logger.Error("Empty response from Claude API.", "error", err)
 		return "", fmt.Errorf("empty response from Claude API")
 	}
 
